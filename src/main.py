@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 import warnings
+import platform
+import shutil
 
 import hydra
 import torch
@@ -55,9 +57,22 @@ def train(cfg_dict: DictConfig):
         os.makedirs(output_dir, exist_ok=True)
     print(cyan(f"Saving outputs to {output_dir}."))
     latest_run = output_dir.parents[1] / "latest-run"
-    os.system(f"rm {latest_run}")
-    os.system(f"ln -s {output_dir} {latest_run}")
-
+    if platform.system() == 'Windows':
+        # Remove old symlink if it exists
+        if os.path.exists(latest_run):
+            if os.path.isdir(latest_run):
+                try:
+                    os.rmdir(latest_run)
+                except OSError:
+                    # If it's not empty or not a symlink
+                    shutil.rmtree(latest_run)
+        
+        # Create symlink on Windows using mklink
+        os.system(f'mklink /D "{latest_run}" "{output_dir}"')
+    else:
+        # Original Unix commands for non-Windows systems
+        os.system(f"rm -f {latest_run}")
+        os.system(f"ln -s {output_dir} {latest_run}")
     # Set up logging with wandb.
     callbacks = []
     if cfg_dict.wandb.mode != "disabled":
